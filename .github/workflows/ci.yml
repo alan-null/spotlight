@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    name: Tests (Python ${{ matrix.python }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ['3.11', '3.14']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install runtime tools
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends fzf file
+      - name: Run regression tests
+        run: python3 -m unittest discover -s tests -v
+      - name: Check benchmark harness
+        run: python3 -m unittest discover -s benchmarks -v
+
+  benchmarks:
+    name: Benchmark report
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build benchmark image
+        run: docker build -f benchmarks/Dockerfile -t spotlight-bench benchmarks
+      - name: Run benchmarks with the built image
+        run: SPOTLIGHT_BENCH_IMAGE=$(docker image inspect spotlight-bench --format '{{.Id}}') bash benchmarks/docker-run.sh . --runs 30 > benchmark-results.json
+      - name: Upload benchmark report
+        uses: actions/upload-artifact@v4
+        with:
+          name: spotlight-benchmarks-${{ github.sha }}
+          path: benchmark-results.json
+          if-no-files-found: error
+          retention-days: 30

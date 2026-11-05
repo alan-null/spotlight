@@ -2,6 +2,14 @@
 
 This harness uses the Python standard library and Bash, with optional GNU time for accurate process memory measurements. Run it against any Spotlight revision without copying the harness into that revision. It does not impose timing assertions on the test suite.
 
+## Continuous integration
+
+The [GitHub Actions workflow](../.github/workflows/ci.yml) runs on pushes, pull requests, and manual dispatches in the Spotlight repository. It runs the regression suite and harness checks on Python 3.11 and 3.14. A separate job builds the benchmark Docker image with GNU time, resolves its immutable image ID, and runs all scenarios with 30 samples and three warmups using the constrained Docker runner described below. Download the JSON report from the run's `spotlight-benchmarks-<commit>` artifact; artifacts are retained for 30 days.
+
+Test failures and benchmark execution errors fail CI. Timing values are informational: shared runners and images rebuilt across workflow runs are not stable enough for performance thresholds or direct historical comparisons. Use the same immutable image and machine for controlled revision comparisons. CI does not run the interactive terminal smoke script; run it separately with real fzf and tmux as described below.
+
+## Run locally
+
 ```sh
 python3 benchmarks/run.py --source . --runs 30 --output /tmp/spotlight-before.json
 bash benchmarks/docker-run.sh . --runs 30 > /tmp/spotlight-container.json

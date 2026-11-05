@@ -1,0 +1,409 @@
+#!/usr/bin/env bash
+set -u
+
+# Tabbed command palette. Requires fzf and Python; history uses POSIX awk.
+# Tmux tabs require tmux >= 3.2.
+SCRIPT_DIR=$(dirname "${BASH_SOURCE[0]}")
+MODULE_DIR=$(dirname "$SCRIPT_DIR")
+PRUNE_FILE="${SPOTLIGHT_PRUNE_FILE:-$MODULE_DIR/config/file-prune.conf}"
+
+encode_file_path() {
+  local value char escaped index
+  REPLY=${1//%/%25}
+  [[ $REPLY =~ [[:cntrl:]] ]] || return 0
+  value=$REPLY REPLY=''
+  for ((index = 0; index < ${#value}; index++)); do
+    char=${value:index:1}
+    if [[ $char =~ [[:cntrl:]] ]]; then
+      printf -v escaped '%%%02X' "'$char"
+      REPLY+=$escaped
+    else
+      REPLY+=$char
+    fi
+  done
+}
+
+decode_file_path() {
+  local value=${1#file:} code char
+  REPLY=''
+  while [[ $value == *%* ]]; do
+    REPLY+=${value%%\%*}
+    value=${value#*%}
+    code=${value:0:2}
+    if [[ $code =~ ^[[:xdigit:]]{2}$ ]]; then
+      printf -v char '%b' "\\x$code"
+      REPLY+=$char
+      value=${value:2}
+    else
+      REPLY+='%'
+    fi
+  done
+  REPLY+=$value
+}
+
+file_row() {
+  local display=$1
+  if [[ $display =~ [[:cntrl:]] ]]; then
+    printf -v display '%q' "$display"
+  fi
+  encode_file_path "$2"
+  printf '  %s\tfile:%s\n' "$display" "$REPLY"
+}
+
+preview() {
+  case "${1:-}" in
+    recent:*)
+      local payload=${1#recent:}
+      preview "${payload#*:}" "${2:-}" "${3:-}" "${4:-}" "${5:-}"
+      ;;
+    module:*) spotlight_module_preview "$1" ;;
+    setting:*) spotlight_setting_preview "$1" "${2:-}" ;;
+    file:*)
+      local encoding
+      decode_file_path "$1"
+      if [[ ! -f $REPLY ]]; then
+        printf 'File no longer exists.\n'
+      elif [[ ! -s $REPLY ]]; then
+        printf '(empty file)\n'
+      elif ! command -v file >/dev/null; then
+        printf 'Install file to preview file contents.\n'
+      elif ! encoding=$(file -b --mime-encoding -- "$REPLY"); then
+        printf 'Preview unavailable.\n'
+      elif [[ $encoding == binary ]]; then
+        printf 'Binary file; preview unavailable.\n'
+      else
+        head -c 65536 -- "$REPLY" | sed -n '1,160p'
+      fi
+      ;;
+    snippet:*)
+      printf '%s\n\n%s\n\n\033[1m%s%s\033[0m\n\n%s\n' "${2:-}" "${3:-}" "$SPOTLIGHT_ANSI_COMMAND" "${4:-}" "${5:-}"
+      ;;
+    install-actions) printf 'ACTIONS\n\nDownload an HTTPS TOML or Navi .cheat file to your user configuration. GitHub file links are accepted.\n' ;;
+  esac
+}
+
+add() {
+  local id="$1" name="$2" category="$3" shortcut="$4" tint
+  local category_key=${category^^}
+  [[ $category_key != DOCKER* ]] || category_key=DOCKER
+  tint=${spotlight_category_colors[$category_key]:-$SPOTLIGHT_ANSI_ACCENT}
+  local reset=$'\033[0m' muted=$SPOTLIGHT_ANSI_HINT
+  # Printable text is padded BEFORE applying ANSI codes, so columns stay aligned.
+  local namecol catcol hintcol
+  printf -v namecol '%-36.36s' "$name"
+  printf -v catcol '%-19.19s' "$category"
+  printf -v hintcol '%s' "$shortcut"
+  printf '%b\t%s\t%s\t%s\t%s\t%s\n' "  ${namecol}  ${tint}${catcol}${reset}  ${muted}${hintcol}${reset}" "$id" "${5:-}" "${6:-}" "${7:-}" "${8:-}"
+}
+
+source "$MODULE_DIR/lib/modules.sh"
+source "$MODULE_DIR/lib/settings.sh"
+
+if [[ "${1:-}" == '--install' ]]; then
+  shift
+  exec python3 "$MODULE_DIR/lib/actions.py" install "$@"
+fi
+
+# Each visible row is a single searchable field; the hidden action ID is after a tab.
+# This avoids fzf --nth filtering out the command name.
+commands() {
+  add install-actions 'Install action file...' 'ACTIONS' 'HTTPS URL'
+
+  local module
+  for module in "${spotlight_modules[@]}"; do
+    spotlight_module_call "$module" commands || return
+  done
+
+  local content name category description snippet context keywords source requires_git_repo action_id cwd git_repo=-1
+  if (( refresh_commands )); then
+    content=$(python3 "$MODULE_DIR/lib/actions.py" cache --refresh) || return 1
+  elif [[ -n ${SPOTLIGHT_ACTION_CACHE_FILE:-} && -f $SPOTLIGHT_ACTION_CACHE_FILE ]]; then
+    content=$(< "$SPOTLIGHT_ACTION_CACHE_FILE") || return 1
+  else
+    content=$(python3 "$MODULE_DIR/lib/actions.py" cache) || return 1
+  fi
+  while IFS=$'\t' read -r name category description snippet context keywords source requires_git_repo action_id || [[ -n "$name$category$description$snippet$context$keywords$source$requires_git_repo$action_id" ]]; do
+    [[ -z "$name" ]] && continue
+    [[ "$context" != tmux || "$in_tmux" == 1 ]] || continue
+    if [[ "$requires_git_repo" == 1 ]]; then
+      if (( git_repo == -1 )); then
+        if (( in_tmux )); then cwd=$(pane_cwd) || return 1; else cwd=$PWD; fi
+        git_repo=0
+        spotlight_in_git_repo "$cwd" && git_repo=1
+      fi
+      (( git_repo == 1 )) || continue
+    fi
+    [[ "$keywords" != '-' ]] || keywords=''
+    add "snippet:$action_id" "$name" "$category" "$description $keywords" "$category" "$description" "$snippet" "$source"
+  done <<< "$content"
+}
+
+load_tab() {
+  case "$1" in
+    Commands) commands ;;
+    Settings) spotlight_settings_rows ;;
+    *.*) spotlight_module_tab_load "$1" ;;
+    Files)
+      local cwd root path name
+      local -a prune_names=(.git) prune_expr=()
+      if (( in_tmux )); then cwd=$(pane_cwd) || return 1; else cwd=$PWD; fi
+      if root=$(git -C "$cwd" rev-parse --show-toplevel 2>/dev/null); then
+        while IFS= read -r -d '' path; do
+          file_row "$path" "$root/$path"
+        done < <(git -C "$root" ls-files -z --cached --others --exclude-standard)
+      else
+        if [[ -f "$PRUNE_FILE" ]]; then
+          prune_names=()
+          while IFS= read -r name || [[ -n "$name" ]]; do
+            [[ -z "$name" || "$name" == \#* ]] || prune_names+=("$name")
+          done < "$PRUNE_FILE"
+        fi
+        for name in "${prune_names[@]}"; do
+          ((${#prune_expr[@]} == 0)) || prune_expr+=(-o)
+          prune_expr+=(-name "$name")
+        done
+        while IFS= read -r -d '' path; do
+          path=${path#"$cwd"/}
+          file_row "$path" "$cwd/$path"
+        done < <(if ((${#prune_expr[@]})); then
+          find "$cwd" -mindepth 1 -type d \( "${prune_expr[@]}" \) -prune -o -type f -print0
+        else
+          find "$cwd" -type f -print0
+        fi)
+      fi
+      ;;
+  esac
+}
+
+pane_cwd() {
+  if [[ -n "${TMUX_PANE:-}" ]]; then
+    tmux display-message -p -t "$TMUX_PANE" '#{pane_current_path}'
+  else
+    tmux display-message -p '#{pane_current_path}'
+  fi
+}
+
+pane_target() {
+  if [[ -n "${TMUX_PANE:-}" ]]; then
+    printf '%s\n' "$TMUX_PANE"
+  else
+    tmux display-message -p '#{pane_id}'
+  fi
+}
+
+if [[ ${1:-} == --popup ]]; then
+  if [[ ${2:-} == --files || ${2:-} == --settings ]]; then
+    spotlight_theme_load || exit 1
+  else
+    spotlight_theme_load --action-cache || exit 1
+  fi
+  shift
+  # tmux's server does not inherit arbitrary client environment variables.
+  printf -v popup_command '%q ' env "SPOTLIGHT_THEME_SHELL=$SPOTLIGHT_THEME_SHELL" "$0" --popup-child "$@"
+  exec tmux display-popup -EE -w 85% -h 70% -d '#{pane_current_path}' -T ' SPOTLIGHT ' -s "$SPOTLIGHT_POPUP_STYLE" -S "$SPOTLIGHT_POPUP_BORDER" "$popup_command"
+fi
+
+if [[ "${1:-}" == '--preview' ]]; then
+  if [[ -z ${SPOTLIGHT_THEME_DATA:-} ]]; then spotlight_theme_load || exit 1; fi
+  preview "${2:-}" "${3:-}" "${4:-}" "${5:-}"
+  exit $?
+fi
+in_tmux=0
+in_popup=0
+[[ -z "${TMUX:-}" ]] || in_tmux=1
+if ! command -v fzf >/dev/null; then
+  echo 'fzf is required. Install it first.' >&2
+  exit 1
+fi
+
+spotlight_load_modules || exit 1
+if [[ ${1:-} == --popup-child && -n ${SPOTLIGHT_THEME_SHELL:-} ]]; then
+  in_popup=1
+  unset SPOTLIGHT_ACTION_CACHE_FILE
+  eval "$SPOTLIGHT_THEME_SHELL"
+  unset SPOTLIGHT_THEME_SHELL
+  shift
+  # ponytail: popup bootstrap precedes discovery; module TOML uses the Python
+  # cache path until a future shared bootstrap needs to combine these stages.
+  if (( ${#spotlight_module_actions[@]} )); then unset SPOTLIGHT_ACTION_CACHE_FILE; fi
+else
+  if [[ ${1:-} == --files || ${1:-} == --settings ]]; then
+    spotlight_theme_load || exit 1
+  else
+    spotlight_theme_load --action-cache || exit 1
+  fi
+fi
+source "$MODULE_DIR/lib/history.sh"
+queries=()
+rows=()
+loaded=()
+for index in "${!tabs[@]}"; do
+  queries[index]='' rows[index]='' loaded[index]=0
+done
+refresh_commands=0
+active=0
+[[ "${1:-}" == '--files' ]] && active=$spotlight_files_index
+[[ "${1:-}" == '--settings' ]] && active=$spotlight_settings_index
+
+# fzf --no-clear leaves its screen visible while the next page loads.
+if command -v tput >/dev/null; then
+  trap 'tput rmcup >/dev/tty 2>/dev/null' EXIT
+fi
+
+restore_terminal() {
+  trap - EXIT
+  tput rmcup 2>/dev/null >/dev/tty || true
+}
+
+while :; do
+  if [[ "${loaded[active]}" == 0 ]]; then
+    if [[ ${tab_ids[active]} == Commands ]]; then spotlight_history_load; fi
+    if ! rows[active]=$(load_tab "${tab_ids[active]}"); then
+      printf 'Failed to load %s tab.\n' "${tabs[active]}" >&2
+      exit 1
+    fi
+    if [[ ${tab_ids[active]} == Commands && ${#spotlight_history_ids[@]} != 0 ]]; then
+      rows[active]=$(spotlight_history_promote "${rows[active]}") || exit 1
+    fi
+    loaded[active]=1
+  fi
+
+  header='  '
+  for index in "${!tabs[@]}"; do
+    printf -v label ' %-10s ' "${tabs[index]}"
+    if (( index == active )); then
+      header+="$SPOTLIGHT_ANSI_TAB$label"$'\033[0m'
+    else
+      header+="$SPOTLIGHT_ANSI_MUTED$label"$'\033[0m'
+    fi
+    header+='  '
+  done
+
+  selected=$(fzf \
+  --no-clear \
+  --ansi \
+  --delimiter=$'\t' \
+  --with-nth=1 \
+  --nth=1 \
+  --layout=reverse \
+  --border=none \
+  --prompt='  Search ❯ ' \
+  --pointer='▸' \
+  --marker='✓' \
+  --info="$SPOTLIGHT_FZF_INFO" \
+  --header="$header" \
+  --header-first \
+  --query="${queries[active]}" \
+  --print-query \
+  --expect=left,right,ctrl-r \
+  --preview="$(printf '%q' "$0") --preview {2} {3} {4} {5} {6}" \
+  --preview-window='right:40%:wrap:border-left' \
+  --bind='ctrl-/:toggle-preview' \
+  --color="$SPOTLIGHT_FZF_COLORS" \
+  < <(printf '%s' "${rows[active]}") 2>&1)
+  status=$?
+  case "$status" in
+    0|1) ;;
+    130) exit 0 ;;
+    *)
+      restore_terminal
+      printf '%s\n' "$selected" | python3 "$MODULE_DIR/lib/spotlight_config.py" fzf-error "$SPOTLIGHT_FZF_INFO"
+      printf 'fzf failed (exit %s).\n' "$status" >&2
+      exit "$status"
+      ;;
+  esac
+
+  mapfile -t response <<< "$selected"
+  queries[active]="${response[0]:-}"
+  case "${response[1]:-}" in
+    left) active=$(( (active + ${#tabs[@]} - 1) % ${#tabs[@]} )); continue ;;
+    right) active=$(( (active + 1) % ${#tabs[@]} )); continue ;;
+    ctrl-r) loaded[active]=0; [[ "${tab_ids[active]}" != Commands ]] || refresh_commands=1; continue ;;
+  esac
+  selected="${response[2]:-}"
+  if [[ -n $selected ]]; then
+    IFS=$'\t' read -r _ selected_id _ <<< "$selected"
+    if [[ $selected_id =~ ^recent:([0-9]+):install-actions$ ]]; then
+      recent_index=${BASH_REMATCH[1]}
+      if [[ ${spotlight_history_ids[recent_index]:-} != install-actions ]]; then
+        printf 'Recent command is no longer available.\n' >&2
+        exit 1
+      fi
+      selected_id=install-actions
+    fi
+    if [[ $selected_id == install-actions ]]; then
+      spotlight_install_actions || exit $?
+      if (( SPOTLIGHT_ACTIONS_INSTALLED )); then
+        spotlight_history_record install-actions '' '' '' || true
+        loaded[active]=0
+        refresh_commands=1
+      fi
+      continue
+    fi
+    if [[ $selected_id == setting:* ]]; then
+      spotlight_setting_select "$selected_id" >&2 || exit 1
+      for index in "${!tabs[@]}"; do loaded[index]=0; done
+      continue
+    fi
+    break
+  fi
+done
+
+# Hidden fields carry the snippet data loaded when this tab was opened.
+IFS=$'\t' read -r _ id _ _ snippet_text source <<< "$selected"
+history_index=''
+if [[ $id == recent:* ]]; then
+  payload=${id#recent:}
+  history_index=${payload%%:*}
+  id=${payload#*:}
+  if [[ ! $history_index =~ ^[0-9]+$ ]] || (( history_index >= ${#spotlight_history_ids[@]} )) || [[ $id != "${spotlight_history_ids[history_index]}" ]]; then
+    printf 'Recent command is no longer available.\n' >&2
+    exit 1
+  fi
+fi
+history_source='' history_template='' history_value=''
+
+case "$id" in
+  snippet:*)
+    if [[ -n $history_index ]]; then
+      source=${spotlight_history_sources[history_index]}
+      snippet_text=${spotlight_history_templates[history_index]}
+    fi
+    spotlight_action_require_available "$source" || exit 1
+    history_source=$source history_template=$snippet_text
+    if (( in_tmux )); then cwd=$(pane_cwd) || exit 1; else cwd=$PWD; fi
+    printf '\033[H\033[2K  Loading action…' >/dev/tty 2>/dev/null || true
+    if [[ -n $history_index ]]; then
+      snippet_text=$(python3 "$MODULE_DIR/lib/actions.py" reuse "$source" "${id#snippet:}" "$snippet_text" "$cwd" "${spotlight_history_values[history_index]}" 2>&1)
+    else
+      snippet_text=$(python3 "$MODULE_DIR/lib/actions.py" resolve "$source" "${id#snippet:}" "$snippet_text" "$cwd" 2>&1)
+    fi
+    status=$?
+    if (( status == 130 && in_popup )); then exit 0; fi
+    if (( status != 0 )); then
+      restore_terminal
+      [[ -z $snippet_text ]] || printf '%s\n' "$snippet_text" >&2
+      exit "$status"
+    fi
+    history_value=$snippet_text
+    spotlight_insert "$snippet_text"
+    ;;
+  file:*)
+    decode_file_path "$id"
+    file=$REPLY
+    if [[ ! -f "$file" ]]; then
+      printf 'File no longer exists: %s\n' "$file" >&2
+      exit 1
+    fi
+    if (( in_tmux )); then cwd=$(pane_cwd) || exit 1; else cwd=$PWD; fi
+    IFS= read -r -d '' path < <(realpath -z --relative-to="$cwd" -- "$file") || exit 1
+    printf -v quoted '%q' "$path"
+    spotlight_insert "$quoted"
+    ;;
+  module:*) spotlight_module_dispatch select "$id" ;;
+esac
+status=$?
+if (( status == 0 )) && [[ ${tab_ids[active]} == Commands && ( $id == snippet:* || $id == module:* ) ]]; then
+  spotlight_history_record "$id" "$history_source" "$history_template" "$history_value" || true
+fi
+exit "$status"

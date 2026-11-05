@@ -1,0 +1,5 @@
+# Unspecified colors inherit Spotlight's original dark palette.
+[colors]
+background = "#161b22"
+foreground = "#d5dce4"
+accent = "#7dd3a8"

@@ -1,0 +1,28 @@
+# Port of VS Code Monokai (Microsoft Corporation, MIT license).
+# Source: https://raw.githubusercontent.com/microsoft/vscode/refs/heads/main/extensions/theme-monokai/themes/monokai-color-theme.json
+# Surfaces follow the editor and quick-input colors; accents use syntax colors.
+# The complete reusable color library is in ../theme-editor/palettes.js.
+[colors]
+background = "#272822"
+foreground = "#f8f8f2"
+selection = "#414339"
+selected_foreground = "#f8f8f2"
+accent = "#a6e22e"
+muted = "#90908a"
+border = "#75715e"
+hint = "#88846f"
+command = "#a6e22e"
+tab_foreground = "#272822"
+error = "#f92672"
+
+[categories]
+WINDOWS = "#66d9ef"
+PANES = "#a6e22e"
+SESSIONS = "#e6db74"
+NAVIGATION = "#ae81ff"
+CLIPBOARD = "#fd971f"
+CONFIGURATION = "#819aff"
+PERSISTENCE = "#e2e22e"
+ACTIONS = "#f92672"
+SYSTEM = "#66d9ef"
+DOCKER = "#a6e22e"

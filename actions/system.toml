@@ -1,0 +1,7 @@
+[[actions]]
+id = "system.update"
+title = "Update system"
+description = "Refresh package lists and upgrade installed packages"
+keywords = ["packages", "upgrade"]
+category = "System"
+command = "sudo apt update && sudo apt upgrade"

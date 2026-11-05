@@ -1,0 +1,28 @@
+# Terminal palette, inspired by lambda-gitster. Named ANSI slots use your terminal's shades.
+# Values are quoted palette indices, "#RRGGBB", or "default" (terminal foreground/background).
+# 0 black, 1 red, 2 green, 3 yellow, 4 blue, 5 magenta, 6 cyan, 7 white; 8–15 are bright variants.
+# See ../../README.md#spotlight-settings-and-themes for custom theme setup and color roles.
+[colors]
+background = "default"
+foreground = "7"
+selection = "8"
+selected_foreground = "15"
+accent = "2"
+muted = "8"
+border = "4"
+hint = "8"
+command = "6"
+tab_foreground = "0"
+error = "1"
+
+[categories]
+WINDOWS = "6"
+PANES = "2"
+SESSIONS = "3"
+NAVIGATION = "5"
+CLIPBOARD = "3"
+CONFIGURATION = "4"
+PERSISTENCE = "2"
+ACTIONS = "6"
+SYSTEM = "6"
+DOCKER = "2"

@@ -5,3 +5,11 @@ description = "Refresh package lists and upgrade installed packages"
 keywords = ["packages", "upgrade"]
 category = "System"
 command = "sudo apt update && sudo apt upgrade"
+
+[[actions]]
+id = "spotlight.clear-actions-cache"
+title = "Clear Spotlight actions cache"
+description = "Delete cached action definitions; reopen Spotlight to load added, changed, or removed actions"
+keywords = ["spotlight", "cache", "clear", "clean", "refresh", "reload", "actions"]
+category = "Spotlight"
+command = '''find "${XDG_CACHE_HOME:-$HOME/.cache}/spotlight" -maxdepth 1 -type f -name 'actions-*.tsv' -delete'''

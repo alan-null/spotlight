@@ -40,6 +40,8 @@ Inside tmux, the bundled module adds Windows, Sessions, and Panes between Comman
 
 Each tab retains its query while Spotlight is open. Command and file selections insert text at the current shell cursor without pressing Enter. File paths are shell quoted and relative to the active shell or pane directory. Built-in tmux operations run immediately; close operations ask for confirmation.
 
+After manually adding, changing, or removing action files, press `Ctrl+R` on Commands to rebuild its persistent cache. Reloading zsh does not clear this cache. You can also select **Clear Spotlight actions cache**, execute the inserted command, and reopen Spotlight. This removes cached action definitions for all source combinations while keeping installed action files and command history.
+
 The launcher lives under `bin/`, helpers under `lib/`, bundled actions under `actions/`, and file search settings under `config/`. Spotlight also reads `~/.config/spotlight/actions/` recursively for per-machine actions, or `$XDG_CONFIG_HOME/spotlight/actions/` when that variable is set. Add another local repository with the colon-separated `SPOTLIGHT_EXTRA_ACTION_PATH` environment variable. `SPOTLIGHT_ACTION_PATH` replaces the default bundled and user action paths for a fully custom setup.
 
 **Settings → Result count position** chooses `inline-right` (default, requires fzf 0.42+) or `inline` (compatible with older fzf). The preference is stored as `core.fzf_info` and applies to the main view and parameter pickers. If an older fzf rejects `inline-right`, Spotlight saves `inline` and asks you to reopen. Failed tmux popups remain open so you can read the error; press Escape to close them.
@@ -83,7 +85,7 @@ requires_git_repo = true
 
 Tmux actions are available only inside tmux. Set `requires_tmux = true` under `[actions.context]` for a custom action that needs tmux. Built-in tmux actions run when selected; TOML actions always insert text. Action IDs must be unique across all sources.
 
-Actions can contain placeholders such as `<image_id>`. Define each placeholder under `[actions.parameters.NAME]`. A parameter with `source` runs that POSIX shell command only after you select the action and offers its output in a picker. Sources run in the active shell or pane directory with a 30-second timeout. Each output line is a value, optionally followed by a tab and a display label; Spotlight inserts the first field with shell quoting. Without `source`, Spotlight asks you to type a value. Repeated placeholders reuse the same answer. Keep placeholders unquoted in the command. Canceling a parameter picker or entering an empty value leaves the shell line unchanged. For example, see [actions/docker.toml](actions/docker.toml):
+Actions can contain placeholders such as `<image_id>`. Define each placeholder under `[actions.parameters.NAME]`. A parameter with `source` runs that POSIX shell command only after you select the action and offers its output in a picker. Sources run in the active shell or pane directory with a 30-second timeout. Each output line is a value, optionally followed by a tab and a display label; Spotlight inserts the first field with shell quoting. Without `source`, Spotlight asks you to type a value. Repeated placeholders reuse the same answer. Keep placeholders unquoted in the command. Canceling a parameter picker or entering an empty value leaves the shell line unchanged. For example, a custom Docker action file can contain:
 
 ```toml
 [[actions]]

@@ -375,10 +375,23 @@ os.execv(sys.executable, [sys.executable, *sys.argv[1:]])
         self.assertEqual(result.stdout, "")
         screens = [c for c in calls if c["tool"] == "fzf"]
         self.assertIn("default", screens[0]["input"])
+        self.assertEqual(screens[1]["input"].splitlines(), sorted(screens[1]["input"].splitlines()))
+        self.assertIn(f'--bind=result:pos({screens[1]["input"].splitlines().index("default") + 1})', screens[1]["args"])
         for screen in screens[2:]:
             self.assertIn("terminal", screen["input"])
             self.assertTrue(any("bg:-1" in arg for arg in screen["args"]))
             self.assertTrue(any("\x1b[48;5;2m" in arg for arg in screen["args"]))
+
+    def test_theme_chooser_starts_on_saved_theme(self):
+        result, calls = self.run_palette(
+            [{"select_contains": "Theme"}, {"status": 130}, {"status": 130}],
+            args=("--settings",), in_tmux=False,
+            config_files={"settings.json": '{"core":{"theme":"terminal"}}'})
+        self.assertEqual(result.returncode, 0, result.stderr)
+        screens = [c for c in calls if c["tool"] == "fzf"]
+        themes = screens[1]["input"].splitlines()
+        self.assertEqual(themes, sorted(themes))
+        self.assertIn(f'--bind=result:pos({themes.index("terminal") + 1})', screens[1]["args"])
 
     def test_settings_cancel_preserves_theme(self):
         result, calls = self.run_palette(

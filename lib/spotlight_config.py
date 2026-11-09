@@ -183,7 +183,7 @@ def main():
     elif operation == 'fzf-error':
         print(fzf_error(sys.stdin.read(), *args), file=sys.stderr)
     elif operation == 'themes':
-        for name in theme_paths():
+        for name in sorted(theme_paths()):
             print(name)
     elif operation == 'get':
         print(get(*args))

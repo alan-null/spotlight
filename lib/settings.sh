@@ -19,7 +19,12 @@ spotlight_setting_set() {
 spotlight_choose() {
   local title=$1 status
   shift
-  SPOTLIGHT_CHOICE=$(printf '%s\n' "$@" | fzf --no-clear --ansi --layout=reverse --border=none --no-preview --no-multi --header-first --pointer='▸' --prompt='  Choose ❯ ' --header="$title" --color="$SPOTLIGHT_FZF_COLORS")
+  local -a options=()
+  if [[ ${1:-} == --position ]]; then
+    options=(--sync --bind="result:pos($2)")
+    shift 2
+  fi
+  SPOTLIGHT_CHOICE=$(printf '%s\n' "$@" | fzf --no-clear --ansi --layout=reverse --border=none --no-preview --no-multi --header-first --pointer='▸' --prompt='  Choose ❯ ' --header="$title" --color="$SPOTLIGHT_FZF_COLORS" "${options[@]}")
   status=$?
   case $status in
     0) [[ -n $SPOTLIGHT_CHOICE ]] ;;
@@ -109,9 +114,13 @@ spotlight_setting_select() {
   module=${payload%%:*}
   if [[ $module == core && ${payload#*:} == theme ]]; then
     names=$(python3 "$MODULE_DIR/lib/spotlight_config.py" themes) || return
-    local -a choices
-    mapfile -t choices <<< "$names"
-    if spotlight_choose 'Settings › Theme' "${choices[@]}"; then
+    local -a choices=()
+    local choice position=1
+    while IFS= read -r choice; do
+      choices+=("$choice")
+      [[ $choice == "$SPOTLIGHT_THEME_NAME" ]] && position=${#choices[@]}
+    done <<< "$names"
+    if spotlight_choose 'Settings › Theme' --position "$position" "${choices[@]}"; then
       spotlight_setting_set core theme "$SPOTLIGHT_CHOICE" || return
       spotlight_theme_load || return
     else

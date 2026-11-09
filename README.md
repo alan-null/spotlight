@@ -2,6 +2,8 @@
 
 A terminal command palette with fuzzy command and file search, tmux navigation, configurable actions, themes, and recent-command history.
 
+Explore the [Spotlight website](docs/) and build a custom palette in the [theme studio](docs/theme-studio/).
+
 ## Installation
 
 Requires Linux, Bash 4+, Python 3.11+, fzf, POSIX awk, and standard GNU command-line utilities. Tmux 3.2+ is needed for popups and tmux navigation. Git enables repository-aware file search; `file` enables text previews. No third-party Python packages are required. The default result count style requires fzf 0.42+; Settings offers `inline` for older versions.

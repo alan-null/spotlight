@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Spotlight is a fast terminal command palette with fuzzy search, tmux navigation, and customizable themes.">
+<title>Spotlight · Your terminal, in focus</title>
+<link rel="icon" href="assets/spotlight-icon-light.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono&amp;family=Space+Grotesk:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<script src="assets/appearance.js"></script>
+<link rel="stylesheet" href="assets/site.css">
+<script src="home.js" defer></script>
+</head>
+<body>
+<header class="site-header"><nav class="site-nav" aria-label="Main navigation"><a class="site-brand" href="./"><img class="brand-light" src="assets/spotlight-icon-light.svg" alt=""><img class="brand-dark" src="assets/spotlight-icon-dark.svg" alt="">spotlight</a><div class="site-links"><a href="#demo">Explore</a><a href="theme-studio/">Theme studio</a><a href="https://github.com/alan-null/spotlight#installation">Install</a><div class="appearance" role="group" aria-label="Page appearance"><button type="button" data-appearance-choice="light" aria-pressed="false">Light</button><button type="button" data-appearance-choice="dark" aria-pressed="false">Dark</button></div></div></nav></header>
+<main class="site-wrap">
+<section class="hero"><div><div class="eyebrow">SMARTER TERMINAL.</div><h1>Your terminal,<br><em>in focus.</em></h1><p>Find commands, files, and tmux sessions without breaking your flow. </p><div class="hero-actions"><a class="action" href="https://github.com/alan-null/spotlight#installation">Get Spotlight <svg class="inline-icon" aria-hidden="true"><use href="assets/icons.svg#terminal"></use></svg></a><a class="action secondary" href="theme-studio/">Open theme studio</a></div></div><div class="hero-art"><img class="hero-mark brand-light" src="assets/spotlight-icon-light.svg" alt="Spotlight lightning logo"><img class="hero-mark brand-dark" src="assets/spotlight-icon-dark.svg" alt="Spotlight lightning logo"></div></section>
+<section class="home-section" id="demo"><div class="eyebrow">See it in action</div><h2>Spotlight in your terminal.</h2><p>Explore a realistic Spotlight session. Search, switch tabs, or select a row.</p><div class="demo-controls"><span>Preview palette</span><div class="demo-palette" role="group" aria-label="Terminal preview palette"><button type="button" data-demo-palette="monoaki" aria-pressed="true">Monoaki</button><button type="button" data-demo-palette="slate" aria-pressed="false">Slate</button><button type="button" data-demo-palette="terminal" aria-pressed="false">Terminal ANSI</button></div></div><div class="demo-terminal" data-palette="monoaki"><div class="demo-topline"><span>┌─ SPOTLIGHT ─────────────────────────────</span></div><div class="demo-tabs" role="group" aria-label="Spotlight tab"><button type="button" data-demo-tab="Commands" aria-pressed="true">Commands</button><button type="button" data-demo-tab="Windows" aria-pressed="false">Windows</button><button type="button" data-demo-tab="Sessions" aria-pressed="false">Sessions</button><button type="button" data-demo-tab="Panes" aria-pressed="false">Panes</button><button type="button" data-demo-tab="Files" aria-pressed="false">Files</button><button type="button" data-demo-tab="Settings" aria-pressed="false">Settings</button></div><div class="demo-main"><div class="demo-left"><div class="demo-search-line"><label for="demo-search">Search ❯</label><input id="demo-search" type="search" autocomplete="off" spellcheck="false" aria-label="Search sample Spotlight results"><span id="demo-count"></span></div><div id="demo-list" class="demo-list" role="listbox" aria-label="Sample Spotlight results" tabindex="0"></div></div><div id="demo-detail" class="demo-detail" aria-live="polite"></div></div></div><p class="demo-note">Preview only.</p></section>
+<section class="home-section" id="features"><div class="eyebrow">Built for the shell</div><h2>Stay in your flow.</h2><div class="feature-grid"><article><h3>Find things fast</h3><p>Fuzzy search across actions and files. Keep your hands on the keyboard.</p></article><article><h3>Move through tmux</h3><p>Jump between sessions, windows, and panes from one palette.</p></article><article><h3>Make it yours</h3><p>Customize actions and colors in the <a href="theme-studio/">theme studio</a>. Save exported themes to <code>~/.config/spotlight/themes/</code>, then select one in Settings → Theme.</p></article></div></section>
+<footer class="site-footer">Spotlight · Open source and made for your terminal. <a href="https://github.com/alan-null/spotlight">View on GitHub <svg class="inline-icon" aria-hidden="true"><use href="assets/icons.svg#external"></use></svg></a></footer>
+</main>
+</body>
+</html>

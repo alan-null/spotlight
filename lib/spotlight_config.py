@@ -113,6 +113,50 @@ def ansi(color, background=False):
     return f'\033[{prefix};5;{color}m'
 
 
+def color_rgb(color):
+    if color.startswith('#'):
+        return tuple(int(color[i:i + 2], 16) for i in (1, 3, 5))
+    if color.isdigit():
+        index = int(color)
+        ansi_palette = ((0, 0, 0), (128, 0, 0), (0, 128, 0), (128, 128, 0),
+                        (0, 0, 128), (128, 0, 128), (0, 128, 128), (192, 192, 192),
+                        (128, 128, 128), (255, 0, 0), (0, 255, 0), (255, 255, 0),
+                        (0, 0, 255), (255, 0, 255), (0, 255, 255), (255, 255, 255))
+        if index < 16:
+            return ansi_palette[index]
+        if index < 232:
+            value = index - 16
+            levels = (0, 95, 135, 175, 215, 255)
+            return levels[value // 36], levels[(value // 6) % 6], levels[value % 6]
+        value = 8 + (index - 232) * 10
+        return value, value, value
+    return None
+
+
+def theme_variant(theme):
+    background = theme['colors']['background']
+    rgb = color_rgb(background)
+    if background == 'default':
+        colorfgbg = os.environ.get('COLORFGBG', '').replace(':', ';').split(';')
+        if colorfgbg and colorfgbg[-1].isdigit():
+            rgb = color_rgb(colorfgbg[-1])
+    if rgb is None:
+        foreground = color_rgb(theme['colors']['foreground'])
+        if foreground is None:
+            return 'dark'
+        rgb = foreground
+        return 'dark' if color_luminance(rgb) >= 0.5 else 'light'
+    luminance = color_luminance(rgb)
+    return 'light' if luminance >= 0.5 else 'dark'
+
+
+def color_luminance(rgb):
+    linear = [channel / 255 for channel in rgb]
+    linear = [value / 12.92 if value <= 0.04045 else ((value + 0.055) / 1.055) ** 2.4
+              for value in linear]
+    return sum(value * weight for value, weight in zip(linear, (0.2126, 0.7152, 0.0722)))
+
+
 def fzf_colors(theme):
     c = theme['colors']
     roles = dict(bg='background', **{'bg+':'selection'}, fg='foreground',
@@ -152,6 +196,7 @@ def shell_theme(include_action_cache=False):
 
     theme = load_theme()
     values = dict(SPOTLIGHT_THEME_DATA=json.dumps(theme), SPOTLIGHT_THEME_NAME=theme['name'],
+                  SPOTLIGHT_THEME_VARIANT=theme_variant(theme),
                   SPOTLIGHT_FZF_INFO=fzf_info(),
                   SPOTLIGHT_FZF_COLORS=fzf_colors(theme),
                   SPOTLIGHT_HISTORY_LIMIT=str(history_limit(get('core', 'history_limit', '5'))),

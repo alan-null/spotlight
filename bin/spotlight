@@ -78,8 +78,64 @@ preview() {
     snippet:*)
       printf '%s\n\n%s\n\n\033[1m%s%s\033[0m\n\n%s\n' "${2:-}" "${3:-}" "$SPOTLIGHT_ANSI_COMMAND" "${4:-}" "${5:-}"
       ;;
+    about) spotlight_about_content ;;
     install-actions) printf 'ACTIONS\n\nDownload an HTTPS TOML or Navi .cheat file to your user configuration. GitHub file links are accepted.\n' ;;
   esac
+}
+
+spotlight_about_content() {
+  local dash thunder reset=$'\033[0m'
+  if [[ ${SPOTLIGHT_THEME_VARIANT:-dark} == light ]]; then
+    dash=$'\033[38;2;228;215;189m' thunder=$'\033[38;2;224;138;0m'
+  else
+    dash=$'\033[38;2;244;236;216m' thunder=$'\033[38;2;255;201;74m'
+  fi
+  printf '%s%s%s\n' "$thunder" '                                                                    ' "$reset"
+  printf '%s%s%s\n' "$thunder" '                                                                 ███' "$reset"
+  printf '%s%s%s\n' "$thunder" '                                                               ████' "$reset"
+  printf '%s%s%s\n' "$thunder" '                                                              █████' "$reset"
+  printf '%s%s%s\n' "$thunder" '                                                            ██████' "$reset"
+  printf '%s%s%s\n' "$thunder" '                                                          ████████' "$reset"
+  printf '%s%s%s\n' "$thunder" '                                                         ████████' "$reset"
+  printf '%s%s%s%s%s\n' "$dash" '                ██████████████████████████████         ' "$thunder" '█████████' "$reset"
+  printf '%s%s%s%s%s\n' "$dash" '               ████████████████████████████████      ' "$thunder" '███████████' "$reset"
+  printf '%s%s%s%s%s\n' "$dash" '               ████████████████████████████████     ' "$thunder" '███████████' "$reset"
+  printf '%s%s%s%s%s\n' "$dash" '                 ████████████████████████████     ' "$thunder" '████████████' "$reset"
+  printf '%s%s%s\n' "$thunder" '                                                ██████████████' "$reset"
+  printf '%s%s%s\n' "$thunder" '                                               ██████████████' "$reset"
+  printf '%s%s%s\n' "$thunder" '                                             ███████████████████████████' "$reset"
+  printf '%s%s%s%s%s\n' "$dash" '  █████████████████████████████████        ' "$thunder" '████████████████████████████' "$reset"
+  printf '%s%s%s%s%s\n' "$dash" ' ███████████████████████████████████      ' "$thunder" '████████████████████████████' "$reset"
+  printf '%s%s%s%s%s\n' "$dash" ' ███████████████████████████████████    ' "$thunder" '████████████████████████████' "$reset"
+  printf '%s%s%s%s%s\n' "$dash" '   ███████████████████████████████     ' "$thunder" '████████████████████████████' "$reset"
+  printf '%s%s%s\n' "$thunder" '                                       ███████████████████████████' "$reset"
+  printf '%s%s%s\n' "$thunder" '                                                  ██████████████' "$reset"
+  printf '%s%s%s\n' "$thunder" '                                                 █████████████' "$reset"
+  printf '%s%s%s%s%s\n' "$dash" '             ███████████████████████            ' "$thunder" '█████████████' "$reset"
+  printf '%s%s%s%s%s\n' "$dash" '            █████████████████████████          ' "$thunder" '████████████' "$reset"
+  printf '%s%s%s%s%s\n' "$dash" '             ███████████████████████           ' "$thunder" '██████████' "$reset"
+  printf '%s%s%s\n' "$thunder" '                                              ██████████' "$reset"
+  printf '%s%s%s\n' "$thunder" '                                             █████████' "$reset"
+  printf '%s%s%s\n' "$thunder" '                                            ████████' "$reset"
+  printf '%s%s%s\n' "$thunder" '                                            ██████' "$reset"
+  printf '%s%s%s\n' "$thunder" '                                           ██████' "$reset"
+  printf '%s%s%s\n' "$thunder" '                                          █████' "$reset"
+  printf '%s%s%s\n\n' "$thunder" '                                          ███' "$reset"
+
+  cat <<'EOF'
+  Spotlight is a terminal command palette for finding commands and files,
+  navigating tmux, and managing personal actions, themes, and settings.
+
+  HIGHLIGHTS
+  • Fuzzy command and file search with previews
+  • Recent command history and reusable parameterized actions
+  • Tmux navigation, popups, and installable action files
+  • Custom themes and local modules
+
+  Built for the terminal. Designed to stay quick and configurable.
+
+  Press Enter or Esc to return to Commands.
+EOF
 }
 
 add() {
@@ -108,6 +164,7 @@ fi
 # This avoids fzf --nth filtering out the command name.
 commands() {
   add install-actions 'Install action file...' 'ACTIONS' 'HTTPS URL'
+  add about 'About spotlight' 'Spotlight' 'About this command palette'
 
   local module
   for module in "${spotlight_modules[@]}"; do
@@ -338,6 +395,12 @@ while :; do
         loaded[active]=0
         refresh_commands=1
       fi
+      continue
+    fi
+    if [[ $selected_id == about ]]; then
+      spotlight_choose "$(spotlight_about_content)" 'Back to Commands'
+      status=$?
+      (( status == 0 || status == 1 )) || exit "$status"
       continue
     fi
     if [[ $selected_id == setting:* ]]; then
